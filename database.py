@@ -423,41 +423,31 @@ def add_user(data):
 
 
 # --- Invoys funksiyalari ---
-
-def get_filtered_invoices(filters):
-    """Filtrlangan invoyslarni qaytaradi."""
-    conn = get_connection()
+def get_filtered_invoices(customer_id=None, status=None):
+    """Filtrlarga asoslangan invoyslarni qaytaradi."""
     try:
+        conn = get_connection()
         cursor = conn.cursor()
         query = """
-            SELECT i.id, i.number AS raqam, c.full_name AS mijoz,
-                   i.amount || ' ' || i.currency AS summa,
-                   i.status AS holati, i.created_at AS sana, i.due_date AS tolov_sana
+            SELECT i.id, c.full_name AS customer_name, i.amount, i.due_date, i.status
             FROM invoices i
-            JOIN deals d ON i.deal_id = d.id
-            JOIN customers c ON d.customer_id = c.id
+            JOIN customers c ON i.customer_id = c.id
             WHERE 1=1
         """
         params = []
-        if filters.get('status'):
+        if customer_id:
+            query += " AND i.customer_id = ?"
+            params.append(customer_id)
+        if status:
             query += " AND i.status = ?"
-            params.append(filters['status'])
-        query += " ORDER BY i.created_at DESC"
+            params.append(status)
         cursor.execute(query, params)
-        return [(
-            row['id'],
-            row['raqam'] or f"INV-{row['id']:04d}",
-            row['mijoz'],
-            row['summa'],
-            row['holati'],
-            row['sana'],
-            row['tolov_sana'] or ""
-        ) for row in cursor.fetchall()]
-    except sqlite3.Error as e:
-        print(f"Xato: Invoyslarni olishda xato: {str(e)}")
-        raise
-    finally:
+        invoices = [dict(row) for row in cursor.fetchall()]
         conn.close()
+        return invoices
+    except Exception as e:
+        print(f"Xato: Invoyslarni filtrlab olishda xato: {str(e)}")
+        raise
 
 def get_deals_for_invoice_form():
     """Invoys formasi uchun kelishuvlarni qaytaradi."""
@@ -935,6 +925,7 @@ def reconcile_expense_payment(cash_entry_id, expense_id):
         conn.close()
 
 def get_cash_journal_entries(filters):
+
     """Filtrlangan kassa jurnali yozuvlarini qaytaradi."""
     conn = get_connection()
     try:
@@ -976,3 +967,39 @@ def get_cash_journal_entries(filters):
         raise
     finally:
         conn.close()
+
+# ... oldingi database.py kodi saqlanadi, faqat quyidagi funksiyalar qo'shiladi ...
+def get_invoice_by_id(invoice_id):
+    """Invoysni ID bo'yicha qaytaradi."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT i.id, i.customer_id, c.full_name AS customer_name, i.amount, i.due_date, i.status
+            FROM invoices i
+            JOIN customers c ON i.customer_id = c.id
+            WHERE i.id = ?
+        """, (invoice_id,))
+        invoice = cursor.fetchone()
+        conn.close()
+        if invoice:
+            return dict(invoice)
+        return None
+    except Exception as e:
+        print(f"Xato: Invoysni olishda xato: {str(e)}")
+        raise
+
+def delete_invoice(invoice_id):
+    """Invoysni o'chiradi."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM invoices WHERE id = ?", (invoice_id,))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Xato: Invoysni o'chirishda xato: {str(e)}")
+        raise
+
+
+
