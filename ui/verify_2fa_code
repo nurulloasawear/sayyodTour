@@ -1,0 +1,243 @@
+# ui/worker_report_view.py
+
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
+from tkcalendar import DateEntry
+from datetime import datetime
+
+# database.py faylidan kerakli funksiyalarni import qilish kerak bo'ladi.
+# Hozircha, bu funksiyalar mavjud deb hisoblaymiz.
+# import database 
+
+class WorkerReportView(ttk.Frame):
+    """Xodimning kunlik hisobotlari va vazifalari uchun interfeys."""
+
+    def __init__(self, parent, controller, *args, **kwargs):
+        super().__init__(parent, *args, **kwargs)
+        self.controller = controller
+        # self.current_user_id = controller.get_current_user_id() # Joriy foydalanuvchi IDsi
+
+        # Asosiy vkladkalar (Notebook)
+        notebook = ttk.Notebook(self)
+        notebook.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Vkladkalarni yaratish
+        self.report_tab = ttk.Frame(notebook)
+        self.tasks_tab = ttk.Frame(notebook)
+        
+        notebook.add(self.report_tab, text="📝 Kunlik Hisobot Topshirish")
+        notebook.add(self.tasks_tab, text="📌 Mening Vazifalarim (Leadlar)")
+
+        # Har bir vkladka uchun interfeys elementlarini chizish
+        self.create_report_widgets()
+        self.create_tasks_widgets()
+
+    # --- 1. Kunlik Hisobot Topshirish Vkladkasi ---
+    def create_report_widgets(self):
+        frame = self.report_tab
+        
+        # Hisobot kiritish formasi
+        form_frame = ttk.LabelFrame(frame, text="Yangi hisobot ma'lumotlari", padding=15)
+        form_frame.pack(fill="x", padx=10, pady=10)
+        form_frame.columnconfigure(1, weight=1)
+        form_frame.columnconfigure(3, weight=1)
+
+        # O'zgaruvchilar
+        self.report_date_var = tk.StringVar(value=datetime.now().strftime('%Y-%m-%d'))
+        self.calls_var = tk.IntVar()
+        self.meetings_var = tk.IntVar()
+        self.sales_count_var = tk.IntVar()
+        self.sales_amount_var = tk.DoubleVar()
+        self.expense_amount_var = tk.DoubleVar()
+        self.expense_note_var = tk.StringVar()
+        self.expense_file_var = tk.StringVar()
+
+        # Maydonlar
+        ttk.Label(form_frame, text="Hisobot sanasi:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        DateEntry(form_frame, textvariable=self.report_date_var, date_pattern='yyyy-mm-dd').grid(row=0, column=1, sticky="ew", padx=5, pady=5)
+        
+        ttk.Label(form_frame, text="Qo'ng'iroqlar soni:").grid(row=1, column=0, sticky="w", padx=5, pady=5)
+        ttk.Entry(form_frame, textvariable=self.calls_var).grid(row=1, column=1, sticky="ew", padx=5, pady=5)
+        
+        ttk.Label(form_frame, text="Uchrashuvlar soni:").grid(row=2, column=0, sticky="w", padx=5, pady=5)
+        ttk.Entry(form_frame, textvariable=self.meetings_var).grid(row=2, column=1, sticky="ew", padx=5, pady=5)
+        
+        ttk.Label(form_frame, text="Sotuvlar soni (dona):").grid(row=1, column=2, sticky="w", padx=5, pady=5)
+        ttk.Entry(form_frame, textvariable=self.sales_count_var).grid(row=1, column=3, sticky="ew", padx=5, pady=5)
+        
+        ttk.Label(form_frame, text="Jami sotuv summasi (UZS):").grid(row=2, column=2, sticky="w", padx=5, pady=5)
+        ttk.Entry(form_frame, textvariable=self.sales_amount_var).grid(row=2, column=3, sticky="ew", padx=5, pady=5)
+
+        # Xarajatlar bo'limi
+        expense_frame = ttk.LabelFrame(form_frame, text="Kunlik Xarajatlar", padding=10)
+        expense_frame.grid(row=3, column=0, columnspan=4, sticky="ew", padx=5, pady=10)
+        expense_frame.columnconfigure(1, weight=1)
+
+        ttk.Label(expense_frame, text="Xarajat summasi (UZS):").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        ttk.Entry(expense_frame, textvariable=self.expense_amount_var).grid(row=0, column=1, sticky="ew", padx=5, pady=5)
+        
+        ttk.Label(expense_frame, text="Xarajat izohi:").grid(row=1, column=0, sticky="w", padx=5, pady=5)
+        ttk.Entry(expense_frame, textvariable=self.expense_note_var).grid(row=1, column=1, sticky="ew", padx=5, pady=5)
+        
+        ttk.Button(expense_frame, text="Chek/Foto yuklash...", command=lambda: self.select_expense_file()).grid(row=2, column=0, padx=5, pady=5)
+        ttk.Label(expense_frame, textvariable=self.expense_file_var, foreground="blue").grid(row=2, column=1, sticky="w", padx=5, pady=5)
+
+        # Saqlash tugmasi
+        ttk.Button(form_frame, text="Hisobotni Saqlash", command=self.save_report, style="Accent.TButton").grid(row=4, column=3, sticky="e", pady=10)
+
+        # Oxirgi hisobotlar jadvali
+        history_frame = ttk.LabelFrame(frame, text="Mening oxirgi hisobotlarim", padding=10)
+        history_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+
+        columns = ("id", "sana", "qongiroqlar", "uchrashuvlar", "sotuvlar_soni", "sotuvlar_summa")
+        self.history_tree = ttk.Treeview(history_frame, columns=columns, show="headings", height=7)
+        self.history_tree.heading("id", text="ID")
+        self.history_tree.heading("sana", text="Sana")
+        self.history_tree.heading("qongiroqlar", text="Qo'ng'iroqlar")
+        self.history_tree.heading("uchrashuvlar", text="Uchrashuvlar")
+        self.history_tree.heading("sotuvlar_soni", text="Sotuvlar (dona)")
+        self.history_tree.heading("sotuvlar_summa", text="Sotuvlar (summa)")
+        self.history_tree.column("id", width=40, anchor="center")
+        self.history_tree.pack(fill="both", expand=True)
+
+        self.refresh_report_history()
+
+    def select_expense_file(self):
+        filepath = filedialog.askopenfilename()
+        if filepath:
+            self.expense_file_var.set(filepath)
+
+    def save_report(self):
+        try:
+            report_data = {
+                "user_id": 1, # self.current_user_id,
+                "report_date": self.report_date_var.get(),
+                "calls": self.calls_var.get(),
+                "meetings": self.meetings_var.get(),
+                "sales_count": self.sales_count_var.get(),
+                "sales_amount": self.sales_amount_var.get(),
+                "expense_amount": self.expense_amount_var.get(),
+                "expense_note": self.expense_note_var.get(),
+                "expense_file": self.expense_file_var.get()
+            }
+            # database.add_daily_report(report_data)
+            print("Hisobot saqlanmoqda:", report_data)
+            messagebox.showinfo("Muvaffaqiyatli", "Kunlik hisobot muvaffaqiyatli saqlandi!")
+            self.refresh_report_history()
+            # Maydonlarni tozalash
+            for var in [self.calls_var, self.meetings_var, self.sales_count_var]: var.set(0)
+            for var in [self.sales_amount_var, self.expense_amount_var]: var.set(0.0)
+            for var in [self.expense_note_var, self.expense_file_var]: var.set("")
+        except tk.TclError:
+            messagebox.showerror("Xatolik", "Iltimos, sonli maydonlarga faqat raqam kiriting!")
+
+    def refresh_report_history(self):
+        for item in self.history_tree.get_children():
+            self.history_tree.delete(item)
+        # reports = database.get_last_reports_for_user(self.current_user_id, limit=10)
+        reports = [ # Simulyatsiya
+            (10, '2025-10-05', 15, 3, 2, '15,000,000'),
+            (9, '2025-10-04', 22, 1, 1, '8,200,000'),
+            (8, '2025-10-03', 18, 4, 3, '21,000,000'),
+        ]
+        for report in reports:
+            self.history_tree.insert("", "end", values=report)
+
+    # --- 2. Mening Vazifalarim (Leadlar) Vkladkasi ---
+    def create_tasks_widgets(self):
+        frame = self.tasks_tab
+        
+        top_frame = ttk.Frame(frame)
+        top_frame.pack(fill='x', padx=10, pady=10)
+        ttk.Label(top_frame, text="Menga biriktirilgan aktiv leadlar", font=("", 12, "bold")).pack(side="left")
+        ttk.Button(top_frame, text="🔄 Ro'yxatni yangilash", command=self.refresh_tasks_treeview).pack(side="right")
+
+        tree_frame = ttk.Frame(frame)
+        tree_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+
+        columns = ("id", "ism", "telefon", "holati", "qayta_aloqa_sana", "izoh")
+        self.tasks_tree = ttk.Treeview(tree_frame, columns=columns, show="headings")
+        self.tasks_tree.heading("id", text="ID")
+        self.tasks_tree.heading("ism", text="Mijoz Ismi")
+        self.tasks_tree.heading("telefon", text="Telefon")
+        self.tasks_tree.heading("holati", text="Holati")
+        self.tasks_tree.heading("qayta_aloqa_sana", text="Qayta aloqa sanasi")
+        self.tasks_tree.heading("izoh", text="Marketing izohi")
+        
+        self.tasks_tree.column("id", width=40)
+        
+        self.tasks_tree.pack(fill="both", expand=True)
+
+        # Amallar paneli
+        action_frame = ttk.Frame(frame)
+        action_frame.pack(fill='x', padx=10, pady=5)
+        ttk.Button(action_frame, text="Izoh qo'shish / Ko'rish...", command=self.manage_lead_notes).pack(side="right")
+        ttk.Button(action_frame, text="Holatini o'zgartirish...", command=self.change_lead_status).pack(side="right", padx=10)
+        
+        self.refresh_tasks_treeview()
+
+    def refresh_tasks_treeview(self):
+        for item in self.tasks_tree.get_children():
+            self.tasks_tree.delete(item)
+        # leads = database.get_leads_for_user(self.current_user_id)
+        leads = [ # Simulyatsiya
+            (2, "Dilnoza Alimova", "+998934445566", "Jarayonda", "2025-10-08", "Antalya haqida so'radi"),
+            (5, "Botir Zokirov", "+998912345678", "Yangi", "2025-10-07", "Oilaviy, byudjet 15mln"),
+        ]
+        for lead in leads:
+            self.tasks_tree.insert("", "end", values=lead)
+            
+    def get_selected_lead_id(self):
+        try:
+            return self.tasks_tree.item(self.tasks_tree.selection()[0])['values'][0]
+        except IndexError:
+            messagebox.showwarning("Ogohlantirish", "Avval ro'yxatdan leadni tanlang!")
+            return None
+
+    def change_lead_status(self):
+        lead_id = self.get_selected_lead_id()
+        if not lead_id: return
+
+        win = tk.Toplevel(self)
+        win.title(f"ID={lead_id} Lead holatini o'zgartirish")
+        
+        ttk.Label(win, text="Yangi holatni tanlang:").pack(padx=20, pady=10)
+        status_var = tk.StringVar()
+        status_combo = ttk.Combobox(win, textvariable=status_var, values=["Jarayonda", "Uchrashuv belgilandi", "Muvaffaqiyatli", "Muvaffaqiyatsiz", "Qayta aloqa kerak"])
+        status_combo.pack(padx=20, fill='x')
+
+        def on_save():
+            new_status = status_var.get()
+            if not new_status: return
+            # database.update_lead_status(lead_id, new_status, self.current_user_id)
+            print(f"Lead ID={lead_id} holati '{new_status}' ga o'zgarildi")
+            self.refresh_tasks_treeview()
+            win.destroy()
+            
+        ttk.Button(win, text="Saqlash", command=on_save).pack(pady=15, padx=20)
+
+    def manage_lead_notes(self):
+        lead_id = self.get_selected_lead_id()
+        if not lead_id: return
+        
+        win = tk.Toplevel(self)
+        win.title(f"ID={lead_id} Lead uchun izohlar")
+        win.geometry("400x300")
+        
+        ttk.Label(win, text="Yangi izoh qo'shish:").pack(padx=10, pady=(10,0), anchor='w')
+        new_note_text = tk.Text(win, height=4)
+        new_note_text.pack(padx=10, pady=5, fill='x')
+        
+        def add_note():
+            note = new_note_text.get("1.0", tk.END).strip()
+            if not note: return
+            # database.add_lead_note(lead_id, note, self.current_user_id)
+            print(f"Lead ID={lead_id} ga yangi izoh qo'shildi: {note}")
+            # Izohlar ro'yxatini yangilash kerak
+            new_note_text.delete("1.0", tk.END)
+
+        ttk.Button(win, text="Izohni qo'shish", command=add_note).pack(padx=10, anchor='e')
+
+        ttk.Label(win, text="Mavjud izohlar:").pack(padx=10, pady=(10,0), anchor='w')
+        # Bu yerga database'dan shu leadga tegishli barcha izohlar olinib,
+        # Listbox yoki Text widget'ga joylashtiriladi.
