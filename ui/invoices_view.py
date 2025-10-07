@@ -132,7 +132,8 @@ class InvoiceEditorWindow(b.Toplevel):
             b.Label(container, text=label).grid(row=i, column=0, padx=5, pady=5, sticky=W)
             if field == "due_date":
                 self.vars[field] = tk.StringVar()
-                b.DateEntry(container, textvariable=self.vars[field], dateformat="%Y-%m-%d").grid(row=i, column=1, sticky="ew")
+                b.Entry(container, textvariable=self.vars[field]).grid(row=i, column=1, sticky="ew")
+
             elif field == "status":
                 self.vars[field] = tk.StringVar()
                 b.Combobox(container, textvariable=self.vars[field], values=["PAID", "UNPAID"], state="readonly").grid(row=i, column=1, sticky="ew")

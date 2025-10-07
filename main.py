@@ -1,173 +1,190 @@
-import tkinter as tk
-import ttkbootstrap as b
-from ttkbootstrap.constants import *
+import customtkinter as ctk
 from tkinter import messagebox
-import database
 import os
-from ui.admin_panel_view import AdminPanelView
-from ui.accountant_view import AccountantView
-from ui.reconciliation_view import ReconciliationView
-from ui.user_create_view import UserCreateView
-from ui.login_view import LoginView
-from ui.dashboard_view import DashboardView
-from ui.invoices_view import InvoicesView
-# Taxminiy panellar (agar mavjud bo'lsa, keyin import qilinadi)
-# from ui.reports_view import ReportsView
-# from ui.crm_view import CRMView
-# from ui.worker_report_view import WorkerReportView
-# from ui.products_view import ProductsView
 
-class App(b.Window):
-    """Asosiy ilova oynasi, barcha panellarga yo'naltirish."""
+# UI sahifalar importi
+from ui.login_view import LoginView as LoginPage
+from ui.user_create_view import UserCreateView  as SignUpPage
+from ui.dashboard_view import DashboardView as DashboardPage
+from ui.invoices_view import InvoicesView as InvoicesPage
+from ui.reconciliation_view import ReconciliationView as ReconciliationPage
+from ui.admin_panel_view import AdminPanelView as AdminPanelPage
+from ui.accountant_view import AccountantView as AccountantPage
+from ui.settings_view import SettingsView as SettingsPage
+
+
+class MainApp(ctk.CTk):
+    """Sayyod Tour CRM — CustomTkinter asosidagi bosh oynasi"""
 
     def __init__(self):
-        super().__init__(title="Sayyod Tour", themename="darkly")
+        super().__init__()
+        self.title("Sayyod Tour CRM")
         self.geometry("1200x800")
+        ctk.set_appearance_mode("dark")
+
+        # --- Dastur holatlari ---
         self.current_user = None
-        self.current_frame = None
-        print("Dastur sozlamalari ishga tushirilmoqda...")
-        self.initialize_database()
-        print("Sozlamalar yuklanmoqda...")
-        self.load_settings()
-        print("Sozlamalar tayyor.")
-
-        self.container = b.Frame(self)
-        self.container.pack(fill=BOTH, expand=YES)
-        self.container.grid_rowconfigure(0, weight=1)
-        self.container.grid_columnconfigure(0, weight=1)
-
         self.frames = {}
-        self.initialize_frames()
-        self.check_initial_user()
+        self.sidebar = None
 
-    def initialize_database(self):
-        """Ma'lumotlar bazasini boshlaydi."""
-        try:
-            database.create_all_tables()
-            print("Ma'lumotlar bazasi muvaffaqiyatli boshlandi.")
-        except Exception as e:
-            print(f"Xato: Ma'lumotlar bazasini boshlashda xato: {str(e)}")
-            messagebox.showerror("Xatolik", f"Ma'lumotlar bazasini boshlashda xato: {str(e)}")
-            self.destroy()
+        # --- Boshlang‘ich sahifani ochish ---
+        self.show_auth_page()
 
-    def load_settings(self):
-        """Sozlamalarni yuklaydi."""
-        try:
-            ip_filtering = database.get_setting("ip_filtering_enabled", "false")
-            print("Sozlamalar muvaffaqiyatli yuklandi.")
-        except Exception as e:
-            print(f"Xato: Sozlamalarni yuklashda xato: {str(e)}")
-            messagebox.showerror("Xatolik", f"Sozlamalarni yuklashda xato: {str(e)}")
-            self.destroy()
+    # -------------------------
+    # 🔹 Kirish/ro‘yxatdan o‘tish oynasi
+    # -------------------------
+    def show_auth_page(self):
+        """Login yoki SignUp oynasini ko‘rsatadi"""
+        if self.sidebar:
+            self.sidebar.destroy()
 
-    def initialize_frames(self):
-        """Barcha panellarni ro'yxatga oladi."""
-        try:
-            frame_classes = [
-                LoginView,
-                UserCreateView,
-                AccountantView,
-                ReconciliationView,
-                DashboardView,
-                AdminPanelView,
-                InvoicesView,
-                # Agar mavjud bo'lsa, quyidagilarni qo'shing:
-                # ReportsView,
-                # CRMView,
-                # WorkerReportView,
-                # ProductsView,
-            ]
-            for F in frame_classes:
-                frame = F(self.container, self)
-                self.frames[F.__name__] = frame
-                frame.grid(row=0, column=0, sticky="nsew")
-            print("Barcha panellar muvaffaqiyatli boshlandi.")
-        except Exception as e:
-            print(f"Xato: Panellarni boshlashda xato: {str(e)}")
-            messagebox.showerror("Xatolik", f"Panellarni boshlashda xato: {str(e)}")
-            self.destroy()
+        self.auth_frame = ctk.CTkFrame(self, fg_color="#1E1E1E")
+        self.auth_frame.pack(fill="both", expand=True)
 
-    def check_initial_user(self):
-        """Birinchi foydalanuvchi mavjudligini tekshiradi."""
-        try:
-            conn = database.get_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) AS count FROM users")
-            user_count = cursor.fetchone()['count']
-            conn.close()
-            if user_count == 0:
-                print("Birinchi foydalanuvchi yaratilishi kerak.")
-                self.show_frame("UserCreateView")
-                self.frames["UserCreateView"].show_back_button(False)
-            else:
-                print("Foydalanuvchilar mavjud, login sahifasiga o'tilmoqda.")
-                self.show_frame("LoginView")
-        except Exception as e:
-            print(f"Xato: Foydalanuvchilarni tekshirishda xato: {str(e)}")
-            messagebox.showerror("Xatolik", f"Foydalanuvchilarni tekshirishda xato: {str(e)}")
-            self.destroy()
+        ctk.CTkLabel(
+            self.auth_frame,
+            text="Sayyod Tour CRM tizimiga xush kelibsiz 👋",
+            font=ctk.CTkFont(size=24, weight="bold"),
+        ).pack(pady=40)
 
-    def show_frame(self, frame_name, **kwargs):
-        """Berilgan freymni ko'rsatadi."""
-        try:
-            frame = self.frames.get(frame_name)
-            if frame:
-                if self.current_frame:
-                    self.current_frame.grid_forget()
-                self.current_frame = frame
-                self.current_frame.grid(row=0, column=0, sticky="nsew")
-                print(f"{frame_name} ko'rsatilmoqda...")
-                if hasattr(frame, "refresh"):
-                    frame.refresh(**kwargs)
-            else:
-                print(f"Xato: {frame_name} topilmadi.")
-                messagebox.showerror("Xatolik", f"Panel topilmadi: {frame_name}")
-        except Exception as e:
-            print(f"Xato: Freymni ko'rsatishda xato: {str(e)}")
-            messagebox.showerror("Xatolik", f"Freymni ko'rsatishda xato: {str(e)}")
+        ctk.CTkButton(
+            self.auth_frame,
+            text="🔐 Kirish (Login)",
+            width=200,
+            height=50,
+            fg_color="#3498db",
+            command=self.open_login_page,
+        ).pack(pady=10)
 
-    def show_login_page(self):
-        """Login sahifasini ko'rsatadi."""
-        self.geometry("600x400")
-        self.show_frame("LoginView")
+        ctk.CTkButton(
+            self.auth_frame,
+            text="🧾 Ro‘yxatdan o‘tish (Sign Up)",
+            width=200,
+            height=50,
+            fg_color="#2ecc71",
+            command=self.open_signup_page,
+        ).pack(pady=10)
 
-    def show_user_create_page(self):
-        """Foydalanuvchi yaratish sahifasini ko'rsatadi."""
-        self.geometry("600x400")
-        self.show_frame("UserCreateView")
+    def open_login_page(self):
+        """Login sahifasiga o‘tish"""
+        self.auth_frame.destroy()
+        LoginPage(self, self.on_login_success)
 
-    def show_dashboard(self, user_data):
-        """Dashboard sahifasini ko'rsatadi."""
-        self.geometry("1200x800")
+    def open_signup_page(self):
+        """SignUp sahifasiga o‘tish"""
+        self.auth_frame.destroy()
+        SignUpPage(self, self.on_signup_success)
+
+    def on_login_success(self, user_data):
+        """Login muvaffaqiyatli bo‘lganda"""
         self.current_user = user_data
-        self.show_frame("DashboardView", user_data=user_data)
+        self.show_main_interface()
 
-    def attempt_login(self, username, password):
-        """Foydalanuvchi loginini tekshiradi."""
-        try:
-            print(f"Attempting login for username: {username}")
-            user_data = database.verify_user_credentials(username, password)
-            if user_data:
-                print(f"Login successful for {username}, role: {user_data['role']}")
-                if user_data.get('requires_2fa'):
-                    messagebox.showinfo("2FA Talab qilinadi", "Ikki faktorli autentifikatsiya kodi kerak.", parent=self.frames["LoginView"])
-                    return user_data
-                else:
-                    self.show_dashboard(user_data)
-                    return user_data
-            else:
-                print(f"Login failed for {username}: Invalid credentials")
-                messagebox.showerror("Xatolik", "Noto'g'ri login yoki parol!", parent=self.frames["LoginView"])
-                return None
-        except Exception as e:
-            print(f"Xato: Login qilishda xato: {str(e)}")
-            messagebox.showerror("Xatolik", f"Login qilishda xato: {str(e)}", parent=self.frames["LoginView"])
-            return None
+    def on_signup_success(self, user_data):
+        """Ro‘yxatdan o‘tishdan so‘ng login sahifasiga qaytish"""
+        messagebox.showinfo("Muvaffaqiyatli", "Foydalanuvchi yaratildi, endi tizimga kiring.")
+        self.show_auth_page()
 
+    # -------------------------
+    # 🔹 Asosiy dastur interfeysi
+    # -------------------------
+    def show_main_interface(self):
+        """Login muvaffaqiyatli bo‘lganda asosiy sahifani ochish"""
+        for widget in self.winfo_children():
+            widget.destroy()
+
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=1)
+
+        # Sidebar (navigatsiya)
+        self.sidebar = ctk.CTkFrame(self, fg_color="#1E1E1E", width=230)
+        self.sidebar.grid(row=0, column=0, sticky="ns")
+        self.sidebar.grid_rowconfigure(8, weight=1)
+
+        # Foydalanuvchi ismi
+        ctk.CTkLabel(
+            self.sidebar,
+            text=f"👤 {self.current_user.get('username', 'Foydalanuvchi')}",
+            font=ctk.CTkFont(size=16, weight="bold"),
+        ).grid(row=0, column=0, padx=20, pady=20)
+
+        # Tugmalar
+        self.create_nav_button("🏠 Dashboard", self.show_dashboard, 1)
+        self.create_nav_button("📄 Invoices", self.show_invoices, 2)
+        self.create_nav_button("📊 Reconciliation", self.show_reconciliation, 3)
+        self.create_nav_button("🛠 Admin Panel", self.show_admin_panel, 4)
+        self.create_nav_button("💰 Accountant", self.show_accountant, 5)
+        self.create_nav_button("⚙️ Settings", self.show_settings, 6)
+
+        ctk.CTkButton(
+            self.sidebar, text="🚪 Chiqish", fg_color="#e74c3c", command=self.logout
+        ).grid(row=9, column=0, padx=20, pady=30, sticky="s")
+
+        # Kontent maydoni
+        self.content_frame = ctk.CTkFrame(self, fg_color="#2C2C2C")
+        self.content_frame.grid(row=0, column=1, sticky="nsew")
+
+        # Dastlab Dashboard ochiladi
+        self.show_dashboard()
+
+    # -------------------------
+    # 🔹 Navigatsion tugmalar
+    # -------------------------
+    def create_nav_button(self, text, command, row):
+        btn = ctk.CTkButton(
+            self.sidebar,
+            text=text,
+            fg_color="transparent",
+            hover_color="#2E86C1",
+            text_color="#ECF0F1",
+            anchor="w",
+            command=command,
+        )
+        btn.grid(row=row, column=0, padx=20, pady=5, sticky="ew")
+
+    def clear_content(self):
+        """Hozirgi sahifani tozalaydi"""
+        for widget in self.content_frame.winfo_children():
+            widget.destroy()
+
+    # -------------------------
+    # 🔹 Sahifalar
+    # -------------------------
+    def show_dashboard(self):
+        self.clear_content()
+        DashboardPage(self.content_frame)
+
+    def show_invoices(self):
+        self.clear_content()
+        InvoicesPage(self.content_frame)
+
+    def show_reconciliation(self):
+        self.clear_content()
+        ReconciliationPage(self.content_frame)
+
+    def show_admin_panel(self):
+        self.clear_content()
+        AdminPanelPage(self.content_frame)
+
+    def show_accountant(self):
+        self.clear_content()
+        AccountantPage(self.content_frame)
+
+    def show_settings(self):
+        self.clear_content()
+        SettingsPage(self.content_frame)
+
+    def logout(self):
+        """Tizimdan chiqish"""
+        confirm = messagebox.askyesno("Chiqish", "Tizimdan chiqmoqchimisiz?")
+        if confirm:
+            self.current_user = None
+            self.show_auth_page()
+
+
+# -------------------------
+# 🔹 Asosiy ishga tushirish
+# -------------------------
 if __name__ == "__main__":
-    # Kerakli papkalarni yaratish
-    for folder in ["ui", "backend", "utils"]:
-        os.makedirs(folder, exist_ok=True)
-    
-    app = App()
+    app = MainApp()
     app.mainloop()

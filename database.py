@@ -93,19 +93,17 @@ def create_all_tables():
                 FOREIGN KEY(product_id) REFERENCES products(id)
             )
         ''')
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS invoices (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                deal_id INTEGER,
-                number TEXT,
-                amount REAL,
-                currency TEXT,
-                status TEXT DEFAULT 'Yangi',
-                due_date TEXT,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(deal_id) REFERENCES deals(id)
+                customer_id INTEGER,
+                amount REAL NOT NULL,
+                due_date TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN ('PAID', 'UNPAID')),
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (customer_id) REFERENCES customers(id)
             )
-        ''')
+         """)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS payments (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
